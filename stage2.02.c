@@ -1,130 +1,222 @@
-// stage2.c
-
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <ctype.h>
+#include <stdlib.h>
 
-#define MAX_NAME 50
-#define MAX_MSG 300
-#define KEYWORD "specter"
+#define MAX_MEMBERS 10
+#define MAX_NAME_LEN 50
+#define MAX_NICKNAME_LEN 20
+#define NUM_TESTS 7
 
-// Arthur's Easter Egg Struct
+// Fitness test names for display
+const char* fitness_test_names[NUM_TESTS] = {
+    "1-Mile Running Test (min for 1.6km)",
+    "Speed Sprint (sec for 100m)",
+    "Push-ups (min for 30 reps)",
+    "Squats (min for 50 reps)",
+    "Arm Strength (min for 50 push-ups)",
+    "Swimming (min for 400m)",
+    "Weightlifting (bodyweight multiplier)"
+};
+
+// Member struct
 typedef struct {
-    char keyword[10];
-    char message[MAX_MSG];
-} ArthurTrauma;
+    char name[MAX_NAME_LEN];
+    char nickname[MAX_NICKNAME_LEN];
+    char gender;  // 'M' or 'F' for weightlifting multiplier rule
+} Member;
 
-// Function to convert char to binary string (8-bit)
-void charToBinary(char c, char *output) {
-    for (int i = 7; i >= 0; i--) {
-        output[7 - i] = ((c >> i) & 1) + '0';
-    }
-    output[8] = '\0';
-}
+// Predefined Milliways members (example)
+Member milliways_members[MAX_MEMBERS] = {
+    {"Alice Kim", "alice", 'F'},
+    {"Bob Lee", "bob", 'M'},
+    {"Cindy Park", "cindy", 'F'},
+    {"David Choi", "david", 'M'}
+};
 
-// Function to reverse a string in-place
-void reverseString(char *str) {
-    int len = strlen(str);
-    for (int i = 0; i < len / 2; i++) {
-        char tmp = str[i];
-        str[i] = str[len - 1 - i];
-        str[len - 1 - i] = tmp;
-    }
-}
+int total_members = 4;
 
-// Function to check if user's character inputs match reversed binary of keyword
-int isRightChar(char reversed_bin[][9], char *input_word) {
-    for (int i = 0; i < 7; i++) {
-        char expected_char = 0;
-        for (int j = 0; j < 8; j++) {
-            expected_char = (expected_char << 1) | (reversed_bin[i][j] - '0');
+// Fitness scores: rows = members, cols = tests
+float health_scores[MAX_MEMBERS][NUM_TESTS] = {0};
+
+// Helper: Find member index by nickname
+int find_member_by_nickname(const char* nickname) {
+    for (int i = 0; i < total_members; i++) {
+        if (strcmp(milliways_members[i].nickname, nickname) == 0) {
+            return i;
         }
-        if (input_word[i] != expected_char) return 0;
     }
-    return 1;
+    return -1; // Not found
 }
 
-// Function to check if input matches the keyword
-int isEasterEgg(char *input) {
-    return strcmp(input, KEYWORD) == 0;
+// Parsing function for comma separated input of 7 floats
+int parse_fitness_data(const char* input, float* scores) {
+    char temp[256];
+    strncpy(temp, input, sizeof(temp));
+    temp[sizeof(temp) - 1] = '\0';
+
+    char *token = strtok(temp, ",");
+    int count = 0;
+
+    while (token != NULL && count < NUM_TESTS) {
+        scores[count] = atof(token);
+        count++;
+        token = strtok(NULL, ",");
+    }
+
+    if (count != NUM_TESTS) {
+        return -1; // error: wrong number of values
+    }
+    return 0; // success
 }
 
-// Function to shuffle keyword (Bonus)
-void shuffleKeyword(char *input, char *output) {
-    int len = strlen(input);
-    int oddIdx = 0, evenIdx = 0;
-    char odd[10], even[10];
+// setHealth(): input fitness data for each member
+void setHealth(void) {
+    char input_line[256];
 
-    for (int i = 0; i < len; i++) {
-        if (i % 2) odd[oddIdx++] = input[i];
-        else even[evenIdx++] = input[i];
+    printf("Enter fitness data for each member as 7 comma-separated values:\n");
+    printf("Format: 1-Mile Running, Speed Sprint, Push-ups, Squats, Arm Strength, Swimming, Weightlifting\n");
+
+    for (int i = 0; i < total_members; i++) {
+        printf("Member %s (%s): ", milliways_members[i].name, milliways_members[i].nickname);
+        if (!fgets(input_line, sizeof(input_line), stdin)) {
+            printf("Input error.\n");
+            return;
+        }
+
+        // Remove trailing newline
+        input_line[strcspn(input_line, "\n")] = 0;
+
+        float scores[NUM_TESTS];
+        if (parse_fitness_data(input_line, scores) != 0) {
+            printf("Error: Please enter exactly 7 comma-separated numeric values.\n");
+            i--; // retry this member
+            continue;
+        }
+
+        // Adjust weightlifting score based on gender rule
+        // Men: 1.5x bodyweight (input as multiplier)
+        // Women: 0.75x bodyweight (input as multiplier)
+        // If input invalid, just store raw value.
+        if (milliways_members[i].gender == 'M') {
+            if (scores[6] < 1.5) {
+                printf("Warning: Weightlifting multiplier for men usually >= 1.5\n");
+            }
+        } else if (milliways_members[i].gender == 'F') {
+            if (scores[6] < 0.75) {
+                printf("Warning: Weightlifting multiplier for women usually >= 0.75\n");
+            }
+        }
+
+        // Store scores
+        for (int j = 0; j < NUM_TESTS; j++) {
+            health_scores[i][j] = scores[j];
+        }
     }
 
-    memcpy(output, odd, oddIdx);
-    memcpy(output + oddIdx, even, evenIdx);
-    output[oddIdx + evenIdx] = '\0';
+    printf("Fitness data recorded successfully.\n");
 }
 
-// Main Easter Egg trigger function
-void find_easter_egg() {
-    ArthurTrauma arthur = {
-        .keyword = "specter",
-        .message = "I confess. After graduating from university, I was blinded by the arrogance of starting a startup and recklessly blocked my friends' paths. I painfully learned that when I am the only one convinced by my idea, it leads to disastrous results. The past Arthur was a ghost of dogmatism and stubbornness."
-    };
+// getHealth(): display fitness data
+void getHealth(void) {
+    char nickname[MAX_NICKNAME_LEN];
+    int member_index = -1;
 
-    printf("<<Arthur's Easter Egg>>\n");
+    printf("[View Fitness Data]\n");
+    printf("1. View all members fitness data\n");
+    printf("2. View one member's complete fitness data\n");
+    printf("3. View one fitness test for one member\n");
+    printf("Select an option: ");
 
-    // Convert to binary and reverse
-    char reversed_bin[7][9];
-    for (int i = 0; i < 7; i++) {
-        char bin[9];
-        charToBinary(arthur.keyword[i], bin);
-        reverseString(bin);
-        strcpy(reversed_bin[i], bin);
-        printf("Reversed Binary for letter %d: %s\n", i + 1, bin);
-    }
+    int option;
+    scanf("%d", &option);
+    getchar(); // consume newline
 
-    printf("Enter the 7 characters matching these binary codes: ");
-    char user_input[10];
-    scanf("%s", user_input);
+    if (option == 1) {
+        printf("\nAll Members Fitness Data:\n");
+        for (int i = 0; i < total_members; i++) {
+            printf("\nName: %s, Nickname: %s\n", milliways_members[i].name, milliways_members[i].nickname);
+            for (int j = 0; j < NUM_TESTS; j++) {
+                printf("%s: %.2f\n", fitness_test_names[j], health_scores[i][j]);
+            }
+        }
+    } else if (option == 2) {
+        printf("Enter member nickname: ");
+        fgets(nickname, sizeof(nickname), stdin);
+        nickname[strcspn(nickname, "\n")] = 0;
 
-    if (!isRightChar(reversed_bin, user_input)) {
-        printf("Incorrect characters. Try again.\n");
-        return;
-    }
+        member_index = find_member_by_nickname(nickname);
+        if (member_index == -1) {
+            printf("Member nickname not found.\n");
+            return;
+        }
 
-    printf("Enter the full keyword: ");
-    char keyword_input[20];
-    scanf("%s", keyword_input);
+        printf("\nFitness data for %s (%s):\n", milliways_members[member_index].name, nickname);
+        for (int j = 0; j < NUM_TESTS; j++) {
+            printf("%s: %.2f\n", fitness_test_names[j], health_scores[member_index][j]);
+        }
+    } else if (option == 3) {
+        char test_name[100];
+        printf("Enter member nickname: ");
+        fgets(nickname, sizeof(nickname), stdin);
+        nickname[strcspn(nickname, "\n")] = 0;
 
-    if (isEasterEgg(keyword_input)) {
-        printf("##Easter Egg Discovered!$$\n%s\n", arthur.message);
+        member_index = find_member_by_nickname(nickname);
+        if (member_index == -1) {
+            printf("Member nickname not found.\n");
+            return;
+        }
+
+        printf("Enter fitness test name (exactly as below):\n");
+        for (int i = 0; i < NUM_TESTS; i++) {
+            printf("- %s\n", fitness_test_names[i]);
+        }
+        printf("Test name: ");
+        fgets(test_name, sizeof(test_name), stdin);
+        test_name[strcspn(test_name, "\n")] = 0;
+
+        int test_index = -1;
+        for (int i = 0; i < NUM_TESTS; i++) {
+            if (strcmp(test_name, fitness_test_names[i]) == 0) {
+                test_index = i;
+                break;
+            }
+        }
+        if (test_index == -1) {
+            printf("Fitness test not found.\n");
+            return;
+        }
+
+        printf("%s's %s: %.2f\n", milliways_members[member_index].name, fitness_test_names[test_index], health_scores[member_index][test_index]);
     } else {
-        printf("Wrong keyword. Returning to menu...\n");
+        printf("Invalid option.\n");
     }
 }
 
-// Dummy menu system
-void menuSystem() {
-    char choice[20];
+// Main menu example for testing
+int main(void) {
+    int choice;
     while (1) {
-        printf("\n[II. Training > 2. Self-Management and Teamwork]\n");
-        printf("Enter member name (or 'exit' to quit): ");
-        scanf("%s", choice);
+        printf("\n[Main Menu]\n");
+        printf("1. Enter Fitness Data\n");
+        printf("2. View Fitness Data\n");
+        printf("3. Exit\n");
+        printf("Select an option: ");
+        scanf("%d", &choice);
+        getchar(); // consume newline
 
-        if (strcasecmp(choice, "Arthur") == 0) {
-            find_easter_egg();
-        } else if (strcasecmp(choice, "exit") == 0) {
-            break;
-        } else {
-            printf("Normal member processing...\n");
+        switch (choice) {
+            case 1:
+                setHealth();
+                break;
+            case 2:
+                getHealth();
+                break;
+            case 3:
+                printf("Exiting program.\n");
+                return 0;
+            default:
+                printf("Invalid option. Try again.\n");
         }
     }
-}
-//hb inject
-int main() {
-    menuSystem();
     return 0;
 }
