@@ -7,24 +7,24 @@
 #define MAX_MENTORS 8
 #define MAX_NAME_LEN 50
 
-// Trainee data
+// --- Global Data ---
 char traineeNames[MAX_TRAINEES][MAX_NAME_LEN] = {
     "Tae", "Minji", "Haru", "Luna", "Kai", "Yuna", "Jisoo", "Hobin"
 };
 
-// Struct for mentors
 struct Mentor {
-    int id; // Unique ID between 1 and 8
+    int id;
     char name[MAX_NAME_LEN];
-    int matchedTrainee; // Trainee index
+    int matchedTrainee; // Index of matched trainee
 };
 
-// Global arrays
 int traineeIDs[MAX_TRAINEES];
 int traineeAbilities[MAX_TRAINEES];
 struct Mentor mentors[MAX_MENTORS];
 
-// Converts a name to an integer using ASCII sum
+// --- Helper Functions ---
+
+// ASCII sum of a string (used as unique ID)
 int parseIntMember(const char* name) {
     int sum = 0;
     for (int i = 0; name[i] != '\0'; i++) {
@@ -33,12 +33,13 @@ int parseIntMember(const char* name) {
     return sum;
 }
 
-// Returns a random ability score between 100 and 1000
+// Random number between 100 and 1000
 int getRandomAbility() {
-    return rand() % 901 + 100; // 100–1000
+    return rand() % 901 + 100;
 }
 
-// Initializes trainees with IDs and random abilities
+// --- Initialization ---
+
 void initializeTrainees() {
     for (int i = 0; i < MAX_TRAINEES; i++) {
         traineeIDs[i] = parseIntMember(traineeNames[i]);
@@ -46,32 +47,51 @@ void initializeTrainees() {
     }
 }
 
-// Adds up to 8 mentors
+// --- Mentor Input ---
+
 void inputMentors() {
     printf("Enter mentor names (max 8):\n");
     for (int i = 0; i < MAX_MENTORS; i++) {
-        printf("Mentor %d name: ", i + 1);
-        scanf(" %[^"]%*c", mentors[i].name); // Read line with spaces
-        mentors[i].id = i + 1;
-        mentors[i].matchedTrainee = -1;
+        while (1) {
+            printf("Mentor %d name: ", i + 1);
+            fgets(mentors[i].name, MAX_NAME_LEN, stdin);
+
+            // Remove newline
+            size_t len = strlen(mentors[i].name);
+            if (len > 0 && mentors[i].name[len - 1] == '\n') {
+                mentors[i].name[len - 1] = '\0';
+            }
+
+            if (strlen(mentors[i].name) == 0) {
+                printf("Invalid name. Please enter again.\n");
+                continue;
+            }
+
+            mentors[i].id = i + 1;
+            mentors[i].matchedTrainee = -1;
+            break;
+        }
     }
+    printf("All 8 mentors have been successfully registered.\n");
 }
 
-// Matches each trainee to a mentor (1:1 guaranteed)
+// --- Matching Logic ---
+
 void matchMentoring() {
-    int availableMentors[MAX_MENTORS] = {0};
+    int usedMentors[MAX_MENTORS] = {0};
 
     for (int i = 0; i < MAX_TRAINEES; i++) {
-        int mentorIndex = i % MAX_MENTORS;
-        if (!availableMentors[mentorIndex]) {
-            mentors[mentorIndex].matchedTrainee = i;
-            availableMentors[mentorIndex] = 1;
+        int preferredIndex = traineeIDs[i] % MAX_MENTORS;
+
+        if (!usedMentors[preferredIndex]) {
+            mentors[preferredIndex].matchedTrainee = i;
+            usedMentors[preferredIndex] = 1;
         } else {
-            // Already matched — find next available
+            // Assign to next available mentor
             for (int j = 0; j < MAX_MENTORS; j++) {
-                if (!availableMentors[j]) {
+                if (!usedMentors[j]) {
                     mentors[j].matchedTrainee = i;
-                    availableMentors[j] = 1;
+                    usedMentors[j] = 1;
                     break;
                 }
             }
@@ -79,7 +99,8 @@ void matchMentoring() {
     }
 }
 
-// Displays matched pairs
+// --- Display Output ---
+
 void printMentorMatches() {
     printf("\n--- Mentoring Matches ---\n");
     for (int i = 0; i < MAX_MENTORS; i++) {
@@ -92,8 +113,10 @@ void printMentorMatches() {
     }
 }
 
+// --- Main ---
+
 int main() {
-    srand(time(NULL)); // Seed randomness
+    srand(time(NULL)); // Seed for random ability scores
 
     initializeTrainees();
     inputMentors();
