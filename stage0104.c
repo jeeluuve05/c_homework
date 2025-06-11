@@ -2,6 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h> // For Sleep() on Windows
+#else
+#include <unistd.h>  // For sleep() on Linux/Mac
+#endif
 
 #define MAX_TRAINEES 4
 #define MAX_QUESTIONS 10
@@ -23,7 +28,7 @@ typedef struct {
 
 typedef struct {
     int questionId;
-    char correctness;
+    char correctness; // 'O' or 'X'
 } QuizAnswer;
 
 // Global arrays
@@ -33,16 +38,23 @@ QuizAnswer quizAnswers[QUIZ_QUESTIONS];
 
 // Initialize question bank
 void initQuestions() {
+    const char *englishWords[MAX_QUESTIONS] = {
+        "Hello", "Thank you", "Goodbye", "Love", "Water",
+        "Friend", "School", "Book", "Eat", "Sleep"
+    };
+    const char *koreanTranslations[MAX_QUESTIONS] = {
+        "안녕하세요", "감사합니다", "안녕히 가세요", "사랑", "물",
+        "친구", "학교", "책", "먹다", "자다"
+    };
+
     for (int i = 0; i < MAX_QUESTIONS; i++) {
         questionBank[i].id = i + 1;
-        sprintf(questionBank[i].content, "Translate '%s' to Korean.", 
-                (char*[]){"Hello", "Thank you", "Goodbye", "Love", "Water", "Friend", "School", "Book", "Eat", "Sleep"}[i]);
-        strcpy(questionBank[i].answer,
-               (char*[]){"안녕하세요", "감사합니다", "안녕히 가세요", "사랑", "물", "친구", "학교", "책", "먹다", "자다"}[i]);
+        sprintf(questionBank[i].content, "Translate '%s' to Korean.", englishWords[i]);
+        strcpy(questionBank[i].answer, koreanTranslations[i]);
     }
 }
 
-// Initialize trainees
+// Initialize trainee data
 void initTrainees() {
     strcpy(trainees[0].name, "John Doe");
     strcpy(trainees[0].nickname, "JD");
@@ -61,7 +73,7 @@ void initTrainees() {
     strcpy(trainees[3].nationality, "Korea");
 }
 
-// Random trainee selector
+// Randomly select a trainee who is not Korean
 int selectRandomTaker() {
     srand(time(NULL));
     int i;
@@ -73,33 +85,37 @@ int selectRandomTaker() {
     return i;
 }
 
-// Check answer correctness and store result
+// Check correctness of answer and record result
 void isAnswer(int index, int questionId, char *userAnswer) {
-    strcpy(quizAnswers[index].correctness, 'X');
     quizAnswers[index].questionId = questionId;
+    quizAnswers[index].correctness = 'X'; // Default: incorrect
 
     for (int i = 0; i < MAX_QUESTIONS; i++) {
         if (questionBank[i].id == questionId) {
             if (strcmp(questionBank[i].answer, userAnswer) == 0) {
-                quizAnswers[index].correctness = 'O';
+                quizAnswers[index].correctness = 'O'; // Correct
             }
             break;
         }
     }
 }
 
-// Serve 5 unique random questions
+// Run quiz with 5 random unique questions
 void serveRandomQuiz(int traineeIndex) {
     int selectedIds[QUIZ_QUESTIONS];
     int used[MAX_QUESTIONS] = {0};
     int score = 0;
 
-    printf("\nQuiz will start in 30 seconds. Prepare yourself...\n\n");
-    sleep(2);  // Replace 2 with 30 in actual implementation
+    printf("\nQuiz will start in 3 seconds. Prepare yourself...\n");
+#ifdef _WIN32
+    Sleep(3000);
+#else
+    sleep(3);
+#endif
     printf("Starting now!\n");
 
     srand(time(NULL));
-    for (int i = 0; i < QUIZ_QUESTIONS; ) {
+    for (int i = 0; i < QUIZ_QUESTIONS;) {
         int q = rand() % MAX_QUESTIONS;
         if (!used[q]) {
             used[q] = 1;
@@ -107,9 +123,8 @@ void serveRandomQuiz(int traineeIndex) {
             printf("\nQ%d: %s\nYour answer: ", i + 1, questionBank[q].content);
 
             char userAnswer[100];
-            getchar();  // Clear buffer
             fgets(userAnswer, sizeof(userAnswer), stdin);
-            userAnswer[strcspn(userAnswer, "\n")] = 0;  // Trim newline
+            userAnswer[strcspn(userAnswer, "\n")] = 0; // Trim newline
 
             isAnswer(i, questionBank[q].id, userAnswer);
             if (quizAnswers[i].correctness == 'O') {
@@ -119,11 +134,9 @@ void serveRandomQuiz(int traineeIndex) {
         }
     }
 
-    // Update trainee
     trainees[traineeIndex].quizScore = score;
     strcpy(trainees[traineeIndex].passStatus, score >= 80 ? "Pass" : "Fail");
 
-    // Show result
     printf("\n=== Quiz Results for %s ===\n", trainees[traineeIndex].name);
     for (int i = 0; i < QUIZ_QUESTIONS; i++) {
         printf("Q%d (ID %d): %c\n", i + 1, quizAnswers[i].questionId, quizAnswers[i].correctness);
@@ -131,13 +144,15 @@ void serveRandomQuiz(int traineeIndex) {
     printf("Total Score: %d\nStatus: %s\n", score, trainees[traineeIndex].passStatus);
 }
 
-// Main quiz function from menu
+// Main function to start quiz
 void testKoreanLang() {
     int taker = selectRandomTaker();
+    // Clear input buffer before starting
+    getchar();
     serveRandomQuiz(taker);
 }
 
-// Menu system (simplified)
+// Simple menu interface
 void showMenu() {
     int choice;
     do {
